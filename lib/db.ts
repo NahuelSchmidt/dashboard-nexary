@@ -1,23 +1,39 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import postgres from 'postgres';
 
-const DB_PATH = path.join(process.cwd(), 'nexary.db');
-
-let db: Database.Database;
+let client: ReturnType<typeof postgres>;
 
 export function getDb() {
-  if (!db) {
-    db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    initDb(db);
+  if (!client) {
+    client = postgres(process.env.DATABASE_URL!, { ssl: 'require' });
   }
-  return db;
+  return client;
 }
 
-function initDb(db: Database.Database) {
-  db.exec(`
+export async function initDb() {
+  const sql = getDb();
+  await sql`
+    CREATE TABLE IF NOT EXISTS projects (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('web', 'turnify', 'gym', 'erp')),
+      description TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS plans (
+      id SERIAL PRIMARY KEY,
+      project_id INTEGER NOT NULL REFERENCES projects(id),
+      name TEXT NOT NULL,
+      price REAL NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS clients (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       company TEXT,
       email TEXT,
@@ -27,31 +43,20 @@ function initDb(db: Database.Database) {
       project_id INTEGER REFERENCES projects(id),
       plan_id INTEGER REFERENCES plans(id),
       monthly_amount REAL,
+      billing_start_date TEXT,
+      discount_months INTEGER DEFAULT 0,
+      discount_amount REAL DEFAULT 0,
       service_email TEXT,
       service_password TEXT,
       start_date TEXT,
       notes TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
 
-    CREATE TABLE IF NOT EXISTS projects (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('web', 'turnify', 'gym', 'erp')),
-      description TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS plans (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      project_id INTEGER NOT NULL REFERENCES projects(id),
-      name TEXT NOT NULL,
-      price REAL NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
+  await sql`
     CREATE TABLE IF NOT EXISTS payments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       client_id INTEGER REFERENCES clients(id),
       project_id INTEGER REFERENCES projects(id),
       description TEXT NOT NULL,
@@ -59,8 +64,7 @@ function initDb(db: Database.Database) {
       status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('paid', 'pending', 'overdue')),
       due_date TEXT,
       paid_date TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
-
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
 }

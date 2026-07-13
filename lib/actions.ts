@@ -2,19 +2,23 @@
 
 import { getDb } from './db';
 import { revalidatePath } from 'next/cache';
-import { ClientType, PaymentStatus } from './types';
+import { Client, ClientType, Payment, PaymentStatus, Plan, Project } from './types';
+
+function thisMonthStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
 
 // ─── Clients ───────────────────────────────────────────────────────────────
 
 export async function getClients() {
-  const db = getDb();
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  return db.prepare(`
+  const sql = getDb();
+  const thisMonth = thisMonthStr();
+  return sql<Client[]>`
     SELECT c.*, p.name as project_name, pl.name as plan_name, pl.price as plan_price,
       COALESCE((SELECT SUM(amount) FROM payments WHERE client_id = c.id AND status = 'paid'), 0) as total_paid,
       COALESCE((SELECT SUM(amount) FROM payments WHERE client_id = c.id AND status != 'paid'), 0) as total_pending,
-      (SELECT status FROM payments WHERE client_id = c.id AND strftime('%Y-%m', created_at) = '${thisMonth}'
+      (SELECT status FROM payments WHERE client_id = c.id AND to_char(created_at, 'YYYY-MM') = ${thisMonth}
        ORDER BY created_at DESC LIMIT 1) as this_month_status,
       (SELECT paid_date FROM payments WHERE client_id = c.id AND status = 'paid'
        ORDER BY paid_date DESC LIMIT 1) as last_paid_date
@@ -22,20 +26,20 @@ export async function getClients() {
     LEFT JOIN projects p ON c.project_id = p.id
     LEFT JOIN plans pl ON c.plan_id = pl.id
     ORDER BY c.created_at DESC
-  `).all();
+  `;
 }
 
 export async function getClientsByProject(projectId: number) {
-  const db = getDb();
-  return db.prepare(`
+  const sql = getDb();
+  return sql<Client[]>`
     SELECT c.*, pl.name as plan_name, pl.price as plan_price,
       COALESCE((SELECT SUM(amount) FROM payments WHERE client_id = c.id AND status = 'paid'), 0) as total_paid,
       COALESCE((SELECT SUM(amount) FROM payments WHERE client_id = c.id AND status != 'paid'), 0) as total_pending
     FROM clients c
     LEFT JOIN plans pl ON c.plan_id = pl.id
-    WHERE c.project_id = ?
+    WHERE c.project_id = ${projectId}
     ORDER BY c.created_at DESC
-  `).all(projectId);
+  `;
 }
 
 export async function createClient(data: {
@@ -44,21 +48,18 @@ export async function createClient(data: {
   billing_start_date?: string; discount_months?: number; discount_amount?: number;
   service_email?: string; service_password?: string; start_date?: string; notes?: string;
 }) {
-  const db = getDb();
-  db.prepare(`
+  const sql = getDb();
+  await sql`
     INSERT INTO clients (name, company, email, phone, type, project_id, plan_id, monthly_amount, billing_start_date, discount_months, discount_amount, service_email, service_password, start_date, notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    data.name, data.company ?? null, data.email ?? null, data.phone ?? null, data.type,
-    data.project_id ?? null, data.plan_id ?? null, data.monthly_amount ?? null,
-    data.billing_start_date ?? null, data.discount_months ?? 0, data.discount_amount ?? 0,
-    data.service_email ?? null, data.service_password ?? null, data.start_date ?? null, data.notes ?? null
-  );
+    VALUES (${data.name}, ${data.company ?? null}, ${data.email ?? null}, ${data.phone ?? null}, ${data.type},
+      ${data.project_id ?? null}, ${data.plan_id ?? null}, ${data.monthly_amount ?? null},
+      ${data.billing_start_date ?? null}, ${data.discount_months ?? 0}, ${data.discount_amount ?? 0},
+      ${data.service_email ?? null}, ${data.service_password ?? null}, ${data.start_date ?? null}, ${data.notes ?? null})
+  `;
   revalidatePath('/');
   revalidatePath('/clients');
   revalidatePath('/projects');
 }
-
 
 export async function updateClient(id: number, data: {
   name?: string; company?: string; email?: string; phone?: string;
@@ -68,45 +69,47 @@ export async function updateClient(id: number, data: {
   service_email?: string | null; service_password?: string | null;
   start_date?: string | null; notes?: string | null;
 }) {
-  const db = getDb();
-  const fields = Object.keys(data).map(k => `${k} = @${k}`).join(', ');
-  const params: Record<string, unknown> = { id };
-  for (const [k, v] of Object.entries(data)) params[k] = v ?? null;
-  db.prepare(`UPDATE clients SET ${fields} WHERE id = @id`).run(params);
+  const sql = getDb();
+  const keys = Object.keys(data);
+  if (keys.length === 0) return;
+  const cleaned: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) cleaned[k] = v ?? null;
+  await sql`UPDATE clients SET ${sql(cleaned, ...(keys as (keyof typeof cleaned)[]))} WHERE id = ${id}`;
   revalidatePath('/clients');
   revalidatePath('/projects');
 }
 
 export async function markClientPaidThisMonth(clientId: number, customAmount?: number) {
-  const db = getDb();
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const sql = getDb();
+  const thisMonth = thisMonthStr();
 
-  // Buscar si ya tiene un pago este mes
-  const existing = db.prepare(`
-    SELECT * FROM payments WHERE client_id = ? AND strftime('%Y-%m', created_at) = ?
+  const existingRows = await sql`
+    SELECT * FROM payments WHERE client_id = ${clientId} AND to_char(created_at, 'YYYY-MM') = ${thisMonth}
     ORDER BY created_at DESC LIMIT 1
-  `).get(clientId, thisMonth) as any;
+  `;
+  const existing = existingRows[0];
 
-  const today = now.toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
 
   if (existing) {
-    db.prepare(`UPDATE payments SET status = 'paid', paid_date = ?, amount = COALESCE(?, amount) WHERE id = ?`)
-      .run(today, customAmount ?? null, existing.id);
+    await sql`UPDATE payments SET status = 'paid', paid_date = ${today}, amount = COALESCE(${customAmount ?? null}, amount) WHERE id = ${existing.id}`;
   } else {
-    let amount = customAmount;
-    if (amount === undefined) {
-      const client = db.prepare(`SELECT * FROM clients WHERE id = ?`).get(clientId) as any;
+    let amount: number;
+    if (customAmount !== undefined) {
+      amount = customAmount;
+    } else {
+      const clientRows = await sql<Client[]>`SELECT * FROM clients WHERE id = ${clientId}`;
+      const client = clientRows[0];
       if (!client) return;
       amount = client.monthly_amount ?? 0;
       if (client.billing_start_date && client.discount_months > 0) {
+        const now = new Date();
         const start = new Date(client.billing_start_date);
         const monthsElapsed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
         if (monthsElapsed < client.discount_months) amount = client.discount_amount ?? 0;
       }
     }
-    db.prepare(`INSERT INTO payments (client_id, description, amount, status, paid_date, due_date) VALUES (?, ?, ?, 'paid', ?, ?)`)
-      .run(clientId, `Suscripción ${thisMonth}`, amount, today, today);
+    await sql`INSERT INTO payments (client_id, description, amount, status, paid_date, due_date) VALUES (${clientId}, ${`Suscripción ${thisMonth}`}, ${amount}, 'paid', ${today}, ${today})`;
   }
 
   revalidatePath('/clients');
@@ -115,36 +118,35 @@ export async function markClientPaidThisMonth(clientId: number, customAmount?: n
 }
 
 export async function getClientMonthStatus(clientId: number): Promise<'paid' | 'pending' | 'none'> {
-  const db = getDb();
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const payment = db.prepare(`
-    SELECT status FROM payments WHERE client_id = ? AND strftime('%Y-%m', created_at) = ?
+  const sql = getDb();
+  const thisMonth = thisMonthStr();
+  const rows = await sql`
+    SELECT status FROM payments WHERE client_id = ${clientId} AND to_char(created_at, 'YYYY-MM') = ${thisMonth}
     ORDER BY created_at DESC LIMIT 1
-  `).get(clientId, thisMonth) as any;
+  `;
+  const payment = rows[0];
   if (!payment) return 'none';
   return payment.status === 'paid' ? 'paid' : 'pending';
 }
 
 export async function generateMonthlyPayments() {
-  const db = getDb();
+  const sql = getDb();
   const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const clients = db.prepare(`
+  const thisMonth = thisMonthStr();
+  const clients = await sql`
     SELECT c.*, pl.price as plan_price FROM clients c
     LEFT JOIN plans pl ON c.plan_id = pl.id
     WHERE c.status = 'active' AND c.monthly_amount IS NOT NULL AND c.monthly_amount > 0
-  `).all() as any[];
+  `;
 
   let created = 0;
   for (const client of clients) {
-    const alreadyBilled = db.prepare(`
+    const alreadyBilledRows = await sql`
       SELECT COUNT(*) as c FROM payments
-      WHERE client_id = ? AND strftime('%Y-%m', created_at) = ?
-    `).get(client.id, thisMonth) as any;
-    if (alreadyBilled.c > 0) continue;
+      WHERE client_id = ${client.id} AND to_char(created_at, 'YYYY-MM') = ${thisMonth}
+    `;
+    if (Number(alreadyBilledRows[0].c) > 0) continue;
 
-    // Calcular si está en período de descuento
     let amount = client.monthly_amount;
     if (client.billing_start_date && client.discount_months > 0) {
       const start = new Date(client.billing_start_date);
@@ -155,8 +157,7 @@ export async function generateMonthlyPayments() {
     }
 
     const dueDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-10`;
-    db.prepare(`INSERT INTO payments (client_id, description, amount, due_date) VALUES (?, ?, ?, ?)`)
-      .run(client.id, `Suscripción ${thisMonth}`, amount, dueDate);
+    await sql`INSERT INTO payments (client_id, description, amount, due_date) VALUES (${client.id}, ${`Suscripción ${thisMonth}`}, ${amount}, ${dueDate})`;
     created++;
   }
   revalidatePath('/payments');
@@ -165,8 +166,8 @@ export async function generateMonthlyPayments() {
 }
 
 export async function deleteClient(id: number) {
-  const db = getDb();
-  db.prepare('DELETE FROM clients WHERE id = ?').run(id);
+  const sql = getDb();
+  await sql`DELETE FROM clients WHERE id = ${id}`;
   revalidatePath('/clients');
   revalidatePath('/projects');
 }
@@ -174,10 +175,10 @@ export async function deleteClient(id: number) {
 // ─── Projects ──────────────────────────────────────────────────────────────
 
 export async function getProjects() {
-  const db = getDb();
-  return db.prepare(`
+  const sql = getDb();
+  return sql<Project[]>`
     SELECT p.*,
-      COUNT(c.id) as client_count,
+      COUNT(c.id)::int as client_count,
       COALESCE((
         SELECT SUM(pay.amount) FROM payments pay
         JOIN clients c2 ON pay.client_id = c2.id
@@ -192,46 +193,45 @@ export async function getProjects() {
     LEFT JOIN clients c ON c.project_id = p.id
     GROUP BY p.id
     ORDER BY p.created_at DESC
-  `).all();
+  `;
 }
 
 export async function getProject(id: number) {
-  const db = getDb();
-  return db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  const sql = getDb();
+  const rows = await sql<Project[]>`SELECT * FROM projects WHERE id = ${id}`;
+  return rows[0];
 }
 
 export async function createProject(data: { name: string; type: ClientType; description?: string }): Promise<number> {
-  const db = getDb();
-  const result = db.prepare('INSERT INTO projects (name, type, description) VALUES (?, ?, ?)').run(
-    data.name, data.type, data.description ?? null
-  );
+  const sql = getDb();
+  const rows = await sql`INSERT INTO projects (name, type, description) VALUES (${data.name}, ${data.type}, ${data.description ?? null}) RETURNING id`;
   revalidatePath('/projects');
-  return Number(result.lastInsertRowid);
+  return Number(rows[0].id);
 }
 
 export async function deleteProject(id: number) {
-  const db = getDb();
-  db.prepare('UPDATE clients SET project_id = NULL WHERE project_id = ?').run(id);
-  db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+  const sql = getDb();
+  await sql`UPDATE clients SET project_id = NULL WHERE project_id = ${id}`;
+  await sql`DELETE FROM projects WHERE id = ${id}`;
   revalidatePath('/projects');
 }
 
 // ─── Payments ──────────────────────────────────────────────────────────────
 
 export async function getPayments() {
-  const db = getDb();
-  return db.prepare(`
+  const sql = getDb();
+  return sql<Payment[]>`
     SELECT pay.*, c.name as client_name, p.name as project_name
     FROM payments pay
     LEFT JOIN clients c ON pay.client_id = c.id
     LEFT JOIN projects p ON c.project_id = p.id
     ORDER BY pay.created_at DESC
-  `).all();
+  `;
 }
 
 export async function getPaymentsByClient(clientId: number) {
-  const db = getDb();
-  return db.prepare(`SELECT * FROM payments WHERE client_id = ? ORDER BY created_at DESC`).all(clientId);
+  const sql = getDb();
+  return sql<Payment[]>`SELECT * FROM payments WHERE client_id = ${clientId} ORDER BY created_at DESC`;
 }
 
 export async function createPayment(data: {
@@ -240,76 +240,83 @@ export async function createPayment(data: {
   amount: number;
   due_date?: string;
 }) {
-  const db = getDb();
-  db.prepare(`
+  const sql = getDb();
+  await sql`
     INSERT INTO payments (client_id, description, amount, due_date)
-    VALUES (?, ?, ?, ?)
-  `).run(data.client_id ?? null, data.description, data.amount, data.due_date ?? null);
+    VALUES (${data.client_id ?? null}, ${data.description}, ${data.amount}, ${data.due_date ?? null})
+  `;
   revalidatePath('/');
   revalidatePath('/payments');
   revalidatePath('/projects');
 }
 
 export async function updatePaymentStatus(id: number, status: PaymentStatus) {
-  const db = getDb();
+  const sql = getDb();
   const paid_date = status === 'paid' ? new Date().toISOString().split('T')[0] : null;
-  db.prepare('UPDATE payments SET status = ?, paid_date = ? WHERE id = ?').run(status, paid_date, id);
+  await sql`UPDATE payments SET status = ${status}, paid_date = ${paid_date} WHERE id = ${id}`;
   revalidatePath('/payments');
   revalidatePath('/projects');
   revalidatePath('/');
 }
 
 export async function deletePayment(id: number) {
-  const db = getDb();
-  db.prepare('DELETE FROM payments WHERE id = ?').run(id);
+  const sql = getDb();
+  await sql`DELETE FROM payments WHERE id = ${id}`;
   revalidatePath('/payments');
 }
 
 // ─── Plans ─────────────────────────────────────────────────────────────────
 
 export async function getPlansByProject(projectId: number) {
-  const db = getDb();
-  return db.prepare('SELECT * FROM plans WHERE project_id = ? ORDER BY price ASC').all(projectId);
+  const sql = getDb();
+  return sql<Plan[]>`SELECT * FROM plans WHERE project_id = ${projectId} ORDER BY price ASC`;
 }
 
 export async function createPlan(data: { project_id: number; name: string; price: number }) {
-  const db = getDb();
-  db.prepare('INSERT INTO plans (project_id, name, price) VALUES (?, ?, ?)').run(data.project_id, data.name, data.price);
+  const sql = getDb();
+  await sql`INSERT INTO plans (project_id, name, price) VALUES (${data.project_id}, ${data.name}, ${data.price})`;
   revalidatePath(`/projects/${data.project_id}`);
 }
 
 export async function updatePlan(id: number, data: { name?: string; price?: number }) {
-  const db = getDb();
-  const fields = Object.keys(data).map(k => `${k} = @${k}`).join(', ');
-  db.prepare(`UPDATE plans SET ${fields} WHERE id = @id`).run({ ...data, id });
+  const sql = getDb();
+  const keys = Object.keys(data);
+  if (keys.length === 0) return;
+  await sql`UPDATE plans SET ${sql(data, ...(keys as (keyof typeof data)[]))} WHERE id = ${id}`;
   revalidatePath('/projects');
 }
 
 export async function deletePlan(id: number, projectId: number) {
-  const db = getDb();
-  db.prepare('UPDATE clients SET plan_id = NULL WHERE plan_id = ?').run(id);
-  db.prepare('DELETE FROM plans WHERE id = ?').run(id);
+  const sql = getDb();
+  await sql`UPDATE clients SET plan_id = NULL WHERE plan_id = ${id}`;
+  await sql`DELETE FROM plans WHERE id = ${id}`;
   revalidatePath(`/projects/${projectId}`);
 }
 
 // ─── Stats ─────────────────────────────────────────────────────────────────
 
 export async function getStats() {
-  const db = getDb();
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const sql = getDb();
+  const thisMonth = thisMonthStr();
 
-  const totalRevenue = (db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM payments WHERE status='paid'`).get() as any).v;
-  const monthRevenue = (db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM payments WHERE status='paid' AND strftime('%Y-%m', paid_date)=?`).get(thisMonth) as any).v;
-  const pending = (db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM payments WHERE status='pending'`).get() as any).v;
-  const activeClients = (db.prepare(`SELECT COUNT(*) as v FROM clients WHERE status='active'`).get() as any).v;
-  const totalProjects = (db.prepare(`SELECT COUNT(*) as v FROM projects`).get() as any).v;
+  const totalRevenueRows = await sql`SELECT COALESCE(SUM(amount),0) as v FROM payments WHERE status='paid'`;
+  const monthRevenueRows = await sql`SELECT COALESCE(SUM(amount),0) as v FROM payments WHERE status='paid' AND to_char(paid_date::date, 'YYYY-MM')=${thisMonth}`;
+  const pendingRows = await sql`SELECT COALESCE(SUM(amount),0) as v FROM payments WHERE status='pending'`;
+  const activeClientsRows = await sql`SELECT COUNT(*)::int as v FROM clients WHERE status='active'`;
+  const totalProjectsRows = await sql`SELECT COUNT(*)::int as v FROM projects`;
 
-  const monthlyRevenue = db.prepare(`
-    SELECT strftime('%Y-%m', paid_date) as month, SUM(amount) as total
+  const monthlyRevenue = await sql`
+    SELECT to_char(paid_date::date, 'YYYY-MM') as month, SUM(amount) as total
     FROM payments WHERE status='paid' AND paid_date IS NOT NULL
     GROUP BY month ORDER BY month DESC LIMIT 6
-  `).all().reverse();
+  `;
 
-  return { totalRevenue, monthRevenue, pending, activeClients, totalProjects, monthlyRevenue };
+  return {
+    totalRevenue: totalRevenueRows[0].v,
+    monthRevenue: monthRevenueRows[0].v,
+    pending: pendingRows[0].v,
+    activeClients: activeClientsRows[0].v,
+    totalProjects: totalProjectsRows[0].v,
+    monthlyRevenue: [...monthlyRevenue].reverse(),
+  };
 }
