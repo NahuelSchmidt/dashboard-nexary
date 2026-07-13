@@ -20,20 +20,26 @@
 
 /* ── Light theme ── */
 .light {
-  --bg: #f8fafc;
+  --bg: #eef1f6;
   --bg-card: #ffffff;
-  --bg-input: #f1f5f9;
+  --bg-input: #f8fafc;
   --bg-sidebar: #ffffff;
-  --border: #e2e8f0;
-  --border-subtle: #f1f5f9;
+  --border: #e1e6ee;
+  --border-subtle: #edf1f6;
   --text: #0f172a;
-  --text-muted: #475569;
-  --text-dim: #94a3b8;
+  --text-muted: #55606f;
+  --text-dim: #97a1b2;
   --brand: #16a34a;
   --brand-dark: #15803d;
-  --brand-glow: rgba(22,163,74,0.2);
-  --brand-subtle: rgba(22,163,74,0.06);
-  --brand-subtle2: rgba(22,163,74,0.1);
+  --brand-glow: rgba(22,163,74,0.18);
+  --brand-subtle: rgba(22,163,74,0.07);
+  --brand-subtle2: rgba(22,163,74,0.12);
+  --card-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 6px 16px rgba(15,23,42,0.05);
+}
+
+.light [class*="rounded-xl"],
+.light [class*="rounded-2xl"] {
+  box-shadow: var(--card-shadow);
 }
 
 body {
