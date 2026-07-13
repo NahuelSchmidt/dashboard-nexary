@@ -1,6 +1,6 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface MonthData {
   month: string;
@@ -14,6 +14,7 @@ function formatMonth(ym: string) {
 }
 
 function fmt(n: number) {
+  if (n >= 1000000) return '$' + (n / 1000000).toFixed(1) + 'M';
   if (n >= 1000) return '$' + (n / 1000).toFixed(0) + 'k';
   return '$' + n;
 }
@@ -21,15 +22,20 @@ function fmt(n: number) {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload?.length) {
     return (
-      <div style={{ background: 'var(--bg-card)', border: '1px solid #1a2035', borderRadius: 8, padding: '10px 14px' }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 14px' }}>
         <p style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 4 }}>{label}</p>
-        <p style={{ color: '#22c55e', fontWeight: 700, fontSize: 15 }}>
+        <p style={{ color: 'var(--brand)', fontWeight: 700, fontSize: 15 }}>
           ${payload[0].value.toLocaleString('es-AR')}
         </p>
       </div>
     );
   }
   return null;
+};
+
+const CustomDot = (props: any) => {
+  const { cx, cy } = props;
+  return <circle cx={cx} cy={cy} r={4} fill="var(--brand)" stroke="var(--bg-card)" strokeWidth={2} />;
 };
 
 export default function RevenueChart({ data }: { data: MonthData[] }) {
@@ -45,33 +51,37 @@ export default function RevenueChart({ data }: { data: MonthData[] }) {
 
   return (
     <ResponsiveContainer width="100%" height={200}>
-      <BarChart data={chartData} barSize={28} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
-        <CartesianGrid vertical={false} stroke="#1a2035" strokeDasharray="0" />
+      <AreaChart data={chartData} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
+        <defs>
+          <linearGradient id="greenGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.25} />
+            <stop offset="100%" stopColor="var(--brand)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="4 4" />
         <XAxis
           dataKey="label"
-          tick={{ fill: 'var(--text-dim)', fontSize: 11 }}
+          tick={{ fill: 'var(--text-dim)', fontSize: 12 }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
-          tick={{ fill: 'var(--text-dim)', fontSize: 11 }}
+          tick={{ fill: 'var(--text-dim)', fontSize: 12 }}
           axisLine={false}
           tickLine={false}
           tickFormatter={fmt}
         />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(34,197,94,0.05)' }} />
-        <Bar
+        <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--brand)', strokeWidth: 1, strokeDasharray: '4 4' }} />
+        <Area
+          type="natural"
           dataKey="total"
+          stroke="var(--brand)"
+          strokeWidth={3}
           fill="url(#greenGradient)"
-          radius={[4, 4, 0, 0]}
+          dot={<CustomDot />}
+          activeDot={{ r: 5, fill: 'var(--brand)', stroke: 'var(--bg-card)', strokeWidth: 2 }}
         />
-        <defs>
-          <linearGradient id="greenGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#22c55e" stopOpacity={0.9} />
-            <stop offset="100%" stopColor="#16a34a" stopOpacity={0.5} />
-          </linearGradient>
-        </defs>
-      </BarChart>
+      </AreaChart>
     </ResponsiveContainer>
   );
 }
