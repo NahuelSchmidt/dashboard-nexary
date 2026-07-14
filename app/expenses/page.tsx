@@ -44,6 +44,7 @@ export default async function ExpensesPage() {
                 <th className="text-left px-5 py-3">Monto</th>
                 <th className="text-left px-5 py-3">Mensual</th>
                 <th className="text-left px-5 py-3">Vencimiento</th>
+                <th className="text-left px-5 py-3">Fecha de pago</th>
                 <th className="text-left px-5 py-3">Estado</th>
                 <th className="px-5 py-3"></th>
               </tr>
@@ -56,6 +57,7 @@ export default async function ExpensesPage() {
                   <td className="px-5 py-3.5 font-semibold" style={{ color: "var(--text)" }}>{fmt(e.amount)}</td>
                   <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{e.is_recurring ? 'Si' : '—'}</td>
                   <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{fmtDate(e.due_date)}</td>
+                  <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{fmtDate(e.paid_date)}</td>
                   <td className="px-5 py-3.5">
                     <Badge label={statusLabel(e.status)} variant={statusVariant(e.status)} />
                   </td>
