@@ -63,3 +63,17 @@ export interface Payment {
   client_name?: string;
   project_name?: string;
 }
+
+export type ExpenseStatus = 'paid' | 'pending';
+
+export interface Expense {
+  id: number;
+  description: string;
+  amount: number;
+  category: string | null;
+  is_recurring: boolean;
+  status: ExpenseStatus;
+  due_date: string | null;
+  paid_date: string | null;
+  created_at: string;
+}

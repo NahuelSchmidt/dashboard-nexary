@@ -25,6 +25,8 @@ export default async function HomePage() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Ingresos este mes" value={fmt(stats.monthRevenue)} color="green" />
+        <StatCard label="Gastos este mes" value={fmt(stats.monthExpenses)} color="yellow" />
+        <StatCard label="Ganancia este mes" value={fmt(stats.monthProfit)} color="brand" />
         <StatCard label="Pendiente de cobro" value={fmt(stats.pending)} color="yellow" />
         <StatCard label="Clientes activos" value={String(stats.activeClients)} color="brand" />
         <StatCard label="Proyectos en curso" value={String(stats.totalProjects)} />

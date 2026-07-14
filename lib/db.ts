@@ -67,4 +67,18 @@ export async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id SERIAL PRIMARY KEY,
+      description TEXT NOT NULL,
+      amount REAL NOT NULL,
+      category TEXT,
+      is_recurring BOOLEAN NOT NULL DEFAULT false,
+      status TEXT NOT NULL DEFAULT 'paid' CHECK(status IN ('paid', 'pending')),
+      due_date TEXT,
+      paid_date TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
 }

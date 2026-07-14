@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, FolderKanban, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Users, FolderKanban, CreditCard, Wallet } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
 const links = [
@@ -10,6 +10,7 @@ const links = [
   { href: '/clients', label: 'Clientes', icon: Users },
   { href: '/projects', label: 'Proyectos', icon: FolderKanban },
   { href: '/payments', label: 'Pagos', icon: CreditCard },
+  { href: '/expenses', label: 'Gastos', icon: Wallet },
 ];
 
 export default function Sidebar() {

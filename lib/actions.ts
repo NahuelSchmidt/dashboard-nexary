@@ -2,7 +2,7 @@
 
 import { getDb } from './db';
 import { revalidatePath } from 'next/cache';
-import { Client, ClientType, Payment, PaymentStatus, Plan, Project } from './types';
+import { Client, ClientType, Expense, ExpenseStatus, Payment, PaymentStatus, Plan, Project } from './types';
 
 function thisMonthStr() {
   const now = new Date();
@@ -293,6 +293,77 @@ export async function deletePlan(id: number, projectId: number) {
   revalidatePath(`/projects/${projectId}`);
 }
 
+// ─── Expenses ──────────────────────────────────────────────────────────────
+
+export async function getExpenses() {
+  const sql = getDb();
+  return sql<Expense[]>`SELECT * FROM expenses ORDER BY created_at DESC`;
+}
+
+export async function createExpense(data: {
+  description: string;
+  amount: number;
+  category?: string;
+  is_recurring?: boolean;
+  due_date?: string;
+  status?: ExpenseStatus;
+}) {
+  const sql = getDb();
+  const status = data.status ?? 'paid';
+  const paid_date = status === 'paid' ? new Date().toISOString().split('T')[0] : null;
+  await sql`
+    INSERT INTO expenses (description, amount, category, is_recurring, status, due_date, paid_date)
+    VALUES (${data.description}, ${data.amount}, ${data.category ?? null}, ${data.is_recurring ?? false}, ${status}, ${data.due_date ?? null}, ${paid_date})
+  `;
+  revalidatePath('/');
+  revalidatePath('/expenses');
+}
+
+export async function updateExpenseStatus(id: number, status: ExpenseStatus) {
+  const sql = getDb();
+  const paid_date = status === 'paid' ? new Date().toISOString().split('T')[0] : null;
+  await sql`UPDATE expenses SET status = ${status}, paid_date = ${paid_date} WHERE id = ${id}`;
+  revalidatePath('/expenses');
+  revalidatePath('/');
+}
+
+export async function deleteExpense(id: number) {
+  const sql = getDb();
+  await sql`DELETE FROM expenses WHERE id = ${id}`;
+  revalidatePath('/expenses');
+  revalidatePath('/');
+}
+
+export async function generateMonthlyExpenses() {
+  const sql = getDb();
+  const thisMonth = thisMonthStr();
+
+  const recurring = await sql<Expense[]>`
+    SELECT DISTINCT ON (description) *
+    FROM expenses
+    WHERE is_recurring = true
+    ORDER BY description, created_at DESC
+  `;
+
+  let created = 0;
+  for (const exp of recurring) {
+    const alreadyBilled = await sql`
+      SELECT COUNT(*) as c FROM expenses
+      WHERE description = ${exp.description} AND is_recurring = true AND to_char(created_at, 'YYYY-MM') = ${thisMonth}
+    `;
+    if (Number(alreadyBilled[0].c) > 0) continue;
+
+    await sql`
+      INSERT INTO expenses (description, amount, category, is_recurring, status, due_date)
+      VALUES (${exp.description}, ${exp.amount}, ${exp.category}, true, 'pending', ${null})
+    `;
+    created++;
+  }
+  revalidatePath('/expenses');
+  revalidatePath('/');
+  return created;
+}
+
 // ─── Stats ─────────────────────────────────────────────────────────────────
 
 export async function getStats() {
@@ -305,18 +376,32 @@ export async function getStats() {
   const activeClientsRows = await sql`SELECT COUNT(*)::int as v FROM clients WHERE status='active'`;
   const totalProjectsRows = await sql`SELECT COUNT(*)::int as v FROM projects`;
 
+  const totalExpensesRows = await sql`SELECT COALESCE(SUM(amount),0) as v FROM expenses WHERE status='paid'`;
+  const monthExpensesRows = await sql`SELECT COALESCE(SUM(amount),0) as v FROM expenses WHERE status='paid' AND to_char(paid_date::date, 'YYYY-MM')=${thisMonth}`;
+  const pendingExpensesRows = await sql`SELECT COALESCE(SUM(amount),0) as v FROM expenses WHERE status='pending'`;
+
   const monthlyRevenue = await sql`
     SELECT to_char(paid_date::date, 'YYYY-MM') as month, SUM(amount) as total
     FROM payments WHERE status='paid' AND paid_date IS NOT NULL
     GROUP BY month ORDER BY month DESC LIMIT 6
   `;
 
+  const monthRevenue = Number(monthRevenueRows[0].v);
+  const monthExpenses = Number(monthExpensesRows[0].v);
+  const totalRevenue = Number(totalRevenueRows[0].v);
+  const totalExpenses = Number(totalExpensesRows[0].v);
+
   return {
-    totalRevenue: totalRevenueRows[0].v,
-    monthRevenue: monthRevenueRows[0].v,
+    totalRevenue,
+    monthRevenue,
     pending: pendingRows[0].v,
     activeClients: activeClientsRows[0].v,
     totalProjects: totalProjectsRows[0].v,
     monthlyRevenue: [...monthlyRevenue].reverse(),
+    totalExpenses,
+    monthExpenses,
+    pendingExpenses: pendingExpensesRows[0].v,
+    monthProfit: monthRevenue - monthExpenses,
+    totalProfit: totalRevenue - totalExpenses,
   };
 }
