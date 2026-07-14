@@ -110,7 +110,7 @@ export default function NewProjectForm() {
                       <div className="flex items-center flex-shrink-0"
                         style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px' }}>
                         <span style={{ color: 'var(--text-dim)', fontSize: 13, marginRight: 2 }}>$</span>
-                        <input type="number" min="0" value={plan.price} onChange={e => updatePlan(i, 'price', e.target.value)}
+                        <input type="number" min="0" step="0.01" value={plan.price} onChange={e => updatePlan(i, 'price', e.target.value)}
                           placeholder="0"
                           style={{ background: 'transparent', border: 'none', outline: 'none', width: 65, fontSize: 13, color: 'var(--text)' }} />
                       </div>

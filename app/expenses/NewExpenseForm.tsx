@@ -44,7 +44,7 @@ export default function NewExpenseForm() {
                 <div className="col-span-2">
                   <Field label="Descripción *" name="description" required placeholder="ej: APIs, hosting, impuestos" />
                 </div>
-                <Field label="Monto *" name="amount" type="number" required min="0" />
+                <Field label="Monto *" name="amount" type="number" required min="0" step="0.01" />
                 <Field label="Categoría" name="category" placeholder="ej: Herramientas" />
                 <Field label="Fecha vencimiento" name="due_date" type="date" />
                 <Select label="Estado" name="status" defaultValue="paid">

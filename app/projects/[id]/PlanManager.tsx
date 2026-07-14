@@ -40,7 +40,7 @@ function PlanRow({ plan }: { plan: Plan }) {
             <input value={name} onChange={e => setName(e.target.value)} style={{ ...inputStyle, width: 140 }} placeholder="Nombre del plan" />
             <div className="flex items-center gap-1" style={{ ...inputStyle }}>
               <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>$</span>
-              <input type="number" value={price} onChange={e => setPrice(e.target.value)} min="0"
+              <input type="number" value={price} onChange={e => setPrice(e.target.value)} min="0" step="0.01"
                 style={{ background: 'transparent', border: 'none', outline: 'none', width: 80, fontSize: 13, color: 'var(--text)' }} />
               <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>/mes</span>
             </div>
@@ -105,7 +105,7 @@ function NewPlanRow({ projectId, onDone }: { projectId: number; onDone: () => vo
           placeholder="Nombre del plan" onKeyDown={e => e.key === 'Enter' && save()} />
         <div className="flex items-center gap-1" style={{ ...inputStyle }}>
           <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>$</span>
-          <input type="number" value={price} onChange={e => setPrice(e.target.value)} min="0"
+          <input type="number" value={price} onChange={e => setPrice(e.target.value)} min="0" step="0.01"
             style={{ background: 'transparent', border: 'none', outline: 'none', width: 80, fontSize: 13, color: 'var(--text)' }}
             placeholder="0" onKeyDown={e => e.key === 'Enter' && save()} />
           <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>/mes</span>

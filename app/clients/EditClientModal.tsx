@@ -120,7 +120,7 @@ export default function EditClientModal({ client, projects, onClose }: {
                   <label style={labelStyle}>Monto mensual</label>
                   <div className="flex items-center" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
                     <span className="px-3 text-sm" style={{ color: 'var(--text-dim)' }}>$</span>
-                    <input type="number" min="0" value={monthlyAmount} onChange={e => setMonthlyAmount(e.target.value)}
+                    <input type="number" min="0" step="0.01" value={monthlyAmount} onChange={e => setMonthlyAmount(e.target.value)}
                       style={{ background: 'transparent', border: 'none', outline: 'none', flex: 1, padding: '8px 0', fontSize: 13, color: 'var(--text)' }} />
                     <span className="px-3 text-xs" style={{ color: 'var(--text-dim)' }}>/mes</span>
                   </div>
@@ -139,7 +139,7 @@ export default function EditClientModal({ client, projects, onClose }: {
                 <label style={labelStyle}>Monto durante descuento</label>
                 <div className="flex items-center" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
                   <span className="px-3 text-sm" style={{ color: 'var(--text-dim)' }}>$</span>
-                  <input name="discount_amount" type="number" min="0" defaultValue={client.discount_amount ?? 0}
+                  <input name="discount_amount" type="number" min="0" step="0.01" defaultValue={client.discount_amount ?? 0}
                     style={{ background: 'transparent', border: 'none', outline: 'none', flex: 1, padding: '8px 0', fontSize: 13, color: 'var(--text)' }} />
                   <span className="px-3 text-xs" style={{ color: 'var(--text-dim)' }}>/mes · 0 = gratis</span>
                 </div>

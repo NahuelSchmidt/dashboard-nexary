@@ -74,7 +74,7 @@ export default function MonthPayBtn({ clientId, clientName, status, monthlyAmoun
               <div className="flex items-center" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
                 <span className="px-3 text-sm font-medium" style={{ color: 'var(--text-dim)' }}>$</span>
                 <input
-                  type="number" min="0" value={amount}
+                  type="number" min="0" step="0.01" value={amount}
                   onChange={e => setAmount(e.target.value)}
                   autoFocus
                   style={{ background: 'transparent', border: 'none', outline: 'none', flex: 1, padding: '10px 0', fontSize: 16, fontWeight: 600, color: 'var(--text)' }}

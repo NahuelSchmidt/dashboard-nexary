@@ -44,7 +44,7 @@ export default function NewPaymentForm({ clients }: { clients: Client[] }) {
                 <div className="col-span-2">
                   <Field label="Descripción *" name="description" required placeholder="ej: Cuota Turnify junio" />
                 </div>
-                <Field label="Monto *" name="amount" type="number" required min="0" />
+                <Field label="Monto *" name="amount" type="number" required min="0" step="0.01" />
                 <Field label="Fecha vencimiento" name="due_date" type="date" />
                 <div className="col-span-2">
                   <Select label="Cliente" name="client_id">
