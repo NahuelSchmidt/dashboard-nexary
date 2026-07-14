@@ -42,7 +42,7 @@ export default function NewExpenseForm() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <Field label="Descripción *" name="description" required placeholder="ej: Paisy, hosting, impuestos" />
+                  <Field label="Descripción *" name="description" required placeholder="ej: APIs, hosting, impuestos" />
                 </div>
                 <Field label="Monto *" name="amount" type="number" required min="0" />
                 <Field label="Categoría" name="category" placeholder="ej: Herramientas" />
