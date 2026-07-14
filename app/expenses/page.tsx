@@ -1,6 +1,7 @@
 import { getExpenses } from '@/lib/actions';
 import { Expense } from '@/lib/types';
 import Badge, { statusVariant, statusLabel } from '@/components/Badge';
+import { fmtDate } from '@/lib/dates';
 import NewExpenseForm from './NewExpenseForm';
 import ExpenseActions from './ExpenseActions';
 import GenerateExpensesBtn from './GenerateExpensesBtn';
@@ -54,7 +55,7 @@ export default async function ExpensesPage() {
                   <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{e.category ?? '—'}</td>
                   <td className="px-5 py-3.5 font-semibold" style={{ color: "var(--text)" }}>{fmt(e.amount)}</td>
                   <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{e.is_recurring ? 'Si' : '—'}</td>
-                  <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{e.due_date ?? '—'}</td>
+                  <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{fmtDate(e.due_date)}</td>
                   <td className="px-5 py-3.5">
                     <Badge label={statusLabel(e.status)} variant={statusVariant(e.status)} />
                   </td>

@@ -6,6 +6,7 @@ import Badge, { typeVariant, typeLabel, statusVariant, statusLabel } from '@/com
 import ClientActions from './ClientActions';
 import MonthPayBtn from './MonthPayBtn';
 import NextDueDate from '@/components/NextDueDate';
+import { fmtDate } from '@/lib/dates';
 import { ChevronDown, Mail, Phone, Calendar, Eye, EyeOff, Key } from 'lucide-react';
 
 function fmt(n: number) {
@@ -30,7 +31,7 @@ export default function ClientRow({ c, showPayments, projects = [] }: { c: Clien
         <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{c.company ?? '—'}</td>
         <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{c.email ?? '—'}</td>
         <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{c.phone ?? '—'}</td>
-        <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{c.start_date ?? '—'}</td>
+        <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{fmtDate(c.start_date)}</td>
         {!showPayments && <td className="px-5 py-3.5"><Badge label={typeLabel(c.type)} variant={typeVariant(c.type)} /></td>}
         <td className="px-5 py-3.5"><Badge label={statusLabel(c.status)} variant={statusVariant(c.status)} /></td>
         <td className="px-5 py-3.5">
@@ -92,7 +93,7 @@ export default function ClientRow({ c, showPayments, projects = [] }: { c: Clien
                 )}
                 {c.start_date && (
                   <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-                    <Calendar size={13} style={{ color: 'var(--text-dim)' }} />Alta: {c.start_date}
+                    <Calendar size={13} style={{ color: 'var(--text-dim)' }} />Alta: {fmtDate(c.start_date)}
                   </div>
                 )}
                 {c.notes && <p className="text-xs mt-2" style={{ color: 'var(--text-dim)' }}>{c.notes}</p>}

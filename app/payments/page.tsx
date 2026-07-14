@@ -1,6 +1,7 @@
 import { getPayments, getClients } from '@/lib/actions';
 import { Payment, Client } from '@/lib/types';
 import Badge, { statusVariant, statusLabel } from '@/components/Badge';
+import { fmtDate } from '@/lib/dates';
 import NewPaymentForm from './NewPaymentForm';
 import PaymentActions from './PaymentActions';
 
@@ -50,7 +51,7 @@ export default async function PaymentsPage() {
                   <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{p.client_name ?? '—'}</td>
                   <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{p.project_name ?? '—'}</td>
                   <td className="px-5 py-3.5 font-semibold" style={{ color: "var(--text)" }}>{fmt(p.amount)}</td>
-                  <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{p.due_date ?? '—'}</td>
+                  <td className="px-5 py-3.5" style={{ color: 'var(--text-muted)' }}>{fmtDate(p.due_date)}</td>
                   <td className="px-5 py-3.5">
                     <Badge label={statusLabel(p.status)} variant={statusVariant(p.status)} />
                   </td>

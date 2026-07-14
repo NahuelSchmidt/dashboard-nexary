@@ -3,6 +3,7 @@ import StatCard from '@/components/StatCard';
 import Badge, { statusVariant, statusLabel } from '@/components/Badge';
 import RevenueChart from '@/components/RevenueChart';
 import { Payment } from '@/lib/types';
+import { fmtDate, TIMEZONE } from '@/lib/dates';
 
 function fmt(n: number) {
   return '$' + n.toLocaleString('es-AR', { minimumFractionDigits: 0 });
@@ -19,7 +20,7 @@ export default async function HomePage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text)" }}>Dashboard</h1>
         <p className="text-sm mt-1 capitalize" style={{ color: 'var(--text-dim)' }}>
-          {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: TIMEZONE })}
         </p>
       </div>
 
@@ -82,7 +83,7 @@ export default async function HomePage() {
                   <div>
                     <p className="text-sm" style={{ color: "var(--text)" }}>{p.description}</p>
                     <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
-                      {p.client_name ?? '—'} {p.due_date ? `· vence ${p.due_date}` : ''}
+                      {p.client_name ?? '—'} {p.due_date ? `· vence ${fmtDate(p.due_date)}` : ''}
                     </p>
                   </div>
                   <div className="text-right">

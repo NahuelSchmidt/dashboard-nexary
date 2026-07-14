@@ -3,10 +3,13 @@
 import { getDb } from './db';
 import { revalidatePath } from 'next/cache';
 import { Client, ClientType, Expense, ExpenseStatus, Payment, PaymentStatus, Plan, Project } from './types';
+import { TIMEZONE, parseDateOnly, todayStr } from './dates';
 
 function thisMonthStr() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE, year: 'numeric', month: '2-digit' }).formatToParts(new Date());
+  const year = parts.find(p => p.type === 'year')!.value;
+  const month = parts.find(p => p.type === 'month')!.value;
+  return `${year}-${month}`;
 }
 
 // ─── Clients ───────────────────────────────────────────────────────────────
@@ -89,7 +92,7 @@ export async function markClientPaidThisMonth(clientId: number, customAmount?: n
   `;
   const existing = existingRows[0];
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayStr();
 
   if (existing) {
     await sql`UPDATE payments SET status = 'paid', paid_date = ${today}, amount = COALESCE(${customAmount ?? null}, amount) WHERE id = ${existing.id}`;
@@ -103,9 +106,9 @@ export async function markClientPaidThisMonth(clientId: number, customAmount?: n
       if (!client) return;
       amount = client.monthly_amount ?? 0;
       if (client.billing_start_date && client.discount_months > 0) {
-        const now = new Date();
-        const start = new Date(client.billing_start_date);
-        const monthsElapsed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+        const [nowYear, nowMonth] = thisMonth.split('-').map(Number);
+        const start = parseDateOnly(client.billing_start_date);
+        const monthsElapsed = (nowYear - start.getFullYear()) * 12 + (nowMonth - 1 - start.getMonth());
         if (monthsElapsed < client.discount_months) amount = client.discount_amount ?? 0;
       }
     }
@@ -131,8 +134,8 @@ export async function getClientMonthStatus(clientId: number): Promise<'paid' | '
 
 export async function generateMonthlyPayments() {
   const sql = getDb();
-  const now = new Date();
   const thisMonth = thisMonthStr();
+  const [nowYear, nowMonth] = thisMonth.split('-').map(Number);
   const clients = await sql`
     SELECT c.*, pl.price as plan_price FROM clients c
     LEFT JOIN plans pl ON c.plan_id = pl.id
@@ -149,14 +152,14 @@ export async function generateMonthlyPayments() {
 
     let amount = client.monthly_amount;
     if (client.billing_start_date && client.discount_months > 0) {
-      const start = new Date(client.billing_start_date);
-      const monthsElapsed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+      const start = parseDateOnly(client.billing_start_date);
+      const monthsElapsed = (nowYear - start.getFullYear()) * 12 + (nowMonth - 1 - start.getMonth());
       if (monthsElapsed < client.discount_months) {
         amount = client.discount_amount ?? 0;
       }
     }
 
-    const dueDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-10`;
+    const dueDate = `${thisMonth}-10`;
     await sql`INSERT INTO payments (client_id, description, amount, due_date) VALUES (${client.id}, ${`Suscripción ${thisMonth}`}, ${amount}, ${dueDate})`;
     created++;
   }
@@ -252,7 +255,7 @@ export async function createPayment(data: {
 
 export async function updatePaymentStatus(id: number, status: PaymentStatus) {
   const sql = getDb();
-  const paid_date = status === 'paid' ? new Date().toISOString().split('T')[0] : null;
+  const paid_date = status === 'paid' ? todayStr() : null;
   await sql`UPDATE payments SET status = ${status}, paid_date = ${paid_date} WHERE id = ${id}`;
   revalidatePath('/payments');
   revalidatePath('/projects');
@@ -310,7 +313,7 @@ export async function createExpense(data: {
 }) {
   const sql = getDb();
   const status = data.status ?? 'paid';
-  const paid_date = status === 'paid' ? new Date().toISOString().split('T')[0] : null;
+  const paid_date = status === 'paid' ? todayStr() : null;
   await sql`
     INSERT INTO expenses (description, amount, category, is_recurring, status, due_date, paid_date)
     VALUES (${data.description}, ${data.amount}, ${data.category ?? null}, ${data.is_recurring ?? false}, ${status}, ${data.due_date ?? null}, ${paid_date})
@@ -321,7 +324,7 @@ export async function createExpense(data: {
 
 export async function updateExpenseStatus(id: number, status: ExpenseStatus) {
   const sql = getDb();
-  const paid_date = status === 'paid' ? new Date().toISOString().split('T')[0] : null;
+  const paid_date = status === 'paid' ? todayStr() : null;
   await sql`UPDATE expenses SET status = ${status}, paid_date = ${paid_date} WHERE id = ${id}`;
   revalidatePath('/expenses');
   revalidatePath('/');

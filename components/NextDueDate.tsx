@@ -1,10 +1,11 @@
 'use client';
 
 import { AlertCircle, Calendar, CheckCircle } from 'lucide-react';
+import { parseDateOnly } from '@/lib/dates';
 
 function getNextDue(billingStartDate: string | null, lastPaidDate: string | null): Date | null {
   if (!billingStartDate) return null;
-  const start = new Date(billingStartDate);
+  const start = parseDateOnly(billingStartDate);
   const now = new Date();
 
   // Día del mes en que vence (mismo día que empezó la suscripción)
@@ -12,7 +13,7 @@ function getNextDue(billingStartDate: string | null, lastPaidDate: string | null
 
   // Si ya pagó este mes, el próximo vencimiento es el mes siguiente
   if (lastPaidDate) {
-    const lastPaid = new Date(lastPaidDate);
+    const lastPaid = parseDateOnly(lastPaidDate);
     const nextDue = new Date(lastPaid.getFullYear(), lastPaid.getMonth() + 1, dueDay);
     return nextDue;
   }
@@ -26,7 +27,9 @@ function getNextDue(billingStartDate: string | null, lastPaidDate: string | null
 }
 
 function formatDate(d: Date): string {
-  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${d.getFullYear()}`;
 }
 
 export default function NextDueDate({ billingStartDate, lastPaidDate, thisMonthStatus }: {
